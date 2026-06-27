@@ -1,7 +1,7 @@
 {
   "title": "DwarfStar (ds4): a native DeepSeek V4 inference engine",
   "description": "A walk through **DwarfStar**, antirez's self-contained C inference engine built specifically for DeepSeek V4 Flash/PRO. It is deliberately narrow: not a generic GGUF runner, but one model done end to end — loading, MLA attention, routed-MoE with 2-bit experts, an on-disk KV cache, SSD weight streaming, distributed inference, an OpenAI/Anthropic-compatible server, and an integrated coding agent.\n\nThis tour assumes the tour file lives at the repo root, so paths are given relative to it. Line numbers track `main` at the time of writing and may drift as the code evolves.",
-  "externalRepository": "https://github.com/antirez/ds4",
+  "externalRepository": "https://github.com/antirez/ds4/tree/80ebbc396aee40eedc1d829222f3362d10fa4c6c",
   "stops": [
     {
       "title": "What this is",
