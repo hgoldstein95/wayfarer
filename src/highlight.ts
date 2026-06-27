@@ -1,7 +1,27 @@
-import { codeToHtml } from "shiki";
+import {
+  codeToTokens,
+  type BundledLanguage,
+  type SpecialLanguage,
+} from "shiki";
+
+/** A single highlighted token: its text and resolved color. */
+export interface Token {
+  content: string;
+  color: string;
+}
+
+/** One line of code as a list of colored tokens (empty for a blank line). */
+export interface CodeLine {
+  tokens: Token[];
+}
 
 /** Map a file extension to a Shiki language id. Unknown -> "text". */
-function languageForFile(file: string): string {
+function languageForFile(file: string): BundledLanguage | SpecialLanguage {
+  const lang = pickLanguage(file);
+  return lang as BundledLanguage | SpecialLanguage;
+}
+
+function pickLanguage(file: string): string {
   const ext = file.slice(file.lastIndexOf(".") + 1).toLowerCase();
   const map: Record<string, string> = {
     ts: "typescript",
@@ -53,29 +73,17 @@ function languageForFile(file: string): string {
 }
 
 /**
- * Highlight `code` to an HTML string. Lines in [startLine, endLine] (1-based)
- * get a `highlighted` class so the UI can emphasize them.
+ * Tokenize `code` into lines of colored tokens. Returning structured lines
+ * (rather than an HTML blob) lets the UI render a snippet, reveal the rest of
+ * the file, and control per-line layout.
  */
-export async function highlight(
+export async function highlightLines(
   code: string,
   file: string,
-  startLine?: number,
-  endLine?: number,
-): Promise<string> {
+): Promise<CodeLine[]> {
   const lang = languageForFile(file);
-  const from = startLine ?? -1;
-  const to = endLine ?? startLine ?? -1;
-  return codeToHtml(code, {
-    lang,
-    theme: "github-dark",
-    transformers: [
-      {
-        line(node, lineNumber) {
-          if (from !== -1 && lineNumber >= from && lineNumber <= to) {
-            this.addClassToHast(node, "line--highlighted");
-          }
-        },
-      },
-    ],
-  });
+  const { tokens } = await codeToTokens(code, { lang, theme: "github-dark" });
+  return tokens.map((line) => ({
+    tokens: line.map((t) => ({ content: t.content, color: t.color ?? "inherit" })),
+  }));
 }
