@@ -15,6 +15,13 @@ export interface Tour {
   title: string;
   /** Optional markdown intro shown before the stops. */
   description?: string;
+  /**
+   * Optional GitHub repository URL (e.g. https://github.com/owner/repo). When
+   * set, every stop `file` is resolved relative to the root of this repo
+   * instead of the tour file's own repo — letting a tour explore some other,
+   * unrelated repository.
+   */
+  externalRepository?: string;
   stops: TourStop[];
 }
 
@@ -52,9 +59,19 @@ export function parseTour(data: unknown): Tour {
       endLine: typeof s.endLine === "number" ? s.endLine : undefined,
     };
   });
+  if (
+    obj.externalRepository !== undefined &&
+    typeof obj.externalRepository !== "string"
+  ) {
+    throw new Error('Tour has a non-string "externalRepository".');
+  }
   return {
     title: obj.title,
     description: typeof obj.description === "string" ? obj.description : undefined,
+    externalRepository:
+      typeof obj.externalRepository === "string"
+        ? obj.externalRepository
+        : undefined,
     stops,
   };
 }

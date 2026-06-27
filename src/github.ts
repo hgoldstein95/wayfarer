@@ -53,6 +53,43 @@ export function parseBlobUrl(input: string): RepoLocation {
   return { owner, repo, branch, path, baseDir: dirname(path) };
 }
 
+/**
+ * Parse a plain repository URL into a RepoLocation rooted at the repo root.
+ *
+ * Used for a tour's optional `externalRepository`: the tour lives in one repo
+ * but its stop files live in another, with paths relative to that repo's root
+ * (so `baseDir` is "" here). Accepts:
+ *   https://github.com/owner/repo
+ *   https://github.com/owner/repo/tree/branch
+ * When no branch is given we use "HEAD", which raw.githubusercontent.com and
+ * github.com both resolve to the repo's default branch.
+ */
+export function parseRepoUrl(input: string): RepoLocation {
+  let url: URL;
+  try {
+    url = new URL(input);
+  } catch {
+    throw new Error(`"${input}" is not a valid repository URL.`);
+  }
+
+  if (url.hostname !== "github.com" && url.hostname !== "www.github.com") {
+    throw new Error("externalRepository must be a github.com URL.");
+  }
+
+  const parts = url.pathname.replace(/^\//, "").replace(/\/$/, "").split("/");
+  if (parts.length < 2 || !parts[0] || !parts[1]) {
+    throw new Error(
+      "externalRepository URL must include an owner and repo, like https://github.com/owner/repo",
+    );
+  }
+  const [owner, repo] = parts;
+  // Optional /tree/<branch> suffix; default to HEAD (the default branch).
+  const branch =
+    parts.length >= 4 && parts[2] === "tree" ? parts.slice(3).join("/") : "HEAD";
+
+  return { owner, repo, branch, path: "", baseDir: "" };
+}
+
 /** Raw content URL for the tour file itself. */
 export function tourRawUrl(loc: RepoLocation): string {
   return rawUrl(loc, loc.path);

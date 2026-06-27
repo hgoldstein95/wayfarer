@@ -57,6 +57,7 @@ type-check/CI gate — keep it green.
 {
   "title": "string (required)",
   "description": "optional markdown intro",
+  "externalRepository": "optional https://github.com/owner/repo[/tree/branch]",
   "stops": [
     {
       "title": "string (required)",
@@ -68,6 +69,12 @@ type-check/CI gate — keep it green.
   ]
 }
 ```
+
+When `externalRepository` is set, stop `file` paths resolve relative to the
+**root of that repo** (not the tour file's directory), so a tour hosted in one
+repo can explore an unrelated repo. With no branch in the URL we fetch `HEAD`
+(the default branch). `App.tsx` derives a separate `fileLoc` for stop fetches
+via `parseRepoUrl`; the tour JSON itself is still fetched from its own repo.
 
 `examples/tour.json` is a working tour of this repo's own source. Its stop
 `line`/`endLine` values are hand-maintained and will drift if the referenced

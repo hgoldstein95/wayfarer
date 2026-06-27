@@ -1,0 +1,63 @@
+{
+  "title": "fractalsearch: an AI agent doing AI research",
+  "description": "`compiler-search` (the repo is actually named **fractalsearch**) is a self-contained harness for a provocative experiment: can an LLM agent run its own open-ended ML research loop? The toy problem is fitting the Mandelbrot set with a universal function approximator. The repo gives the agent an immutable target, a `Solution` contract, a timed evaluator, and a live dashboard — then lets it churn out and score candidate architectures forever. This tour walks the data flow from the goal, through the ground truth and the solution interface, to the metric, example solutions, and the monitoring UI.",
+  "externalRepository": "https://github.com/aaronjeline/compiler-search",
+  "stops": [
+    {
+      "title": "The premise: a strange loop on a toy problem",
+      "content": "The README frames the whole project. The question is **\"Can AI Agents do AI research?\"**, posed on a deliberately small but bottomless problem: how well can a function approximator fit the Mandelbrot set? It is a low-dimensional `(real, imag) -> value` curve fit, but the image \"has infinite detail and complexity at every scale,\" so there is no ceiling on how good a model can get.\n\nThe key design move is in the last paragraph: the human \"overseer\" never writes code directly. They edit a prompt file (`AGENT.md`), point any AI agent at it, and let it run. All the code in this repo was itself AI-generated; the human only wrote the prose.",
+      "file": "README.md",
+      "line": 1,
+      "endLine": 12
+    },
+    {
+      "title": "AGENT.md: the rules of the game",
+      "content": "`AGENT.md` is the actual program — the prompt handed to the agent that defines the research task. It is worth reading as the spec the rest of the code enforces:\n\n- The **target** lives in `harness/groundtruth.py` and is *immutable*.\n- The **metric** is MSE over a fixed dense grid versus that ground truth (`harness/evaluate.py`). Lower is better, and it is the *only* objective.\n- Each run gets a **fixed 5-minute training budget**, force-killed at 10 minutes. Because compute is fixed, the agent is told to spend all of it — \"a massive network that scores better *is* better.\"\n\nElsewhere the file lays down hard constraints (don't touch `harness/`, don't hard-code the Mandelbrot algorithm into a solution, don't add dependencies) and an explicit \"LOOP FOREVER\" research loop: hypothesize, copy the best prior solution, commit, evaluate, read the result, repeat.",
+      "file": "AGENT.md",
+      "line": 8,
+      "endLine": 18
+    },
+    {
+      "title": "The ground truth: what the model must learn",
+      "content": "`harness/groundtruth.py` is the single source of truth for the target, and the `mandelbrot` function is its heart. For each point `c`, it runs escape-time iteration `z <- z^2 + c` while also tracking the orbit derivative `z' = dz/dc`. At the escape step this yields a distance-to-set estimate `d = |z|*log|z| / |z'|`.\n\nThe clever part is the encoding (lines 102-105): instead of a monotonic \"smooth iteration count,\" the distance is folded into a **periodic** value via `phase = BETA*log(d)` and a sine, giving a band pattern whose frequency grows without bound as you approach the boundary. The comment calls this out as deliberate — it \"never saturates and exposes fine structure at every scale,\" making the fit intentionally hard. Points that never escape are pinned to `1.0` (in the set). Everything is computed in float64 for accuracy and returned as float32 in `[0, 1]`.",
+      "file": "harness/groundtruth.py",
+      "line": 59,
+      "endLine": 106
+    },
+    {
+      "title": "The Solution contract every approach implements",
+      "content": "`harness/interface.py` defines the boundary between the harness and a candidate. A `Solution` is *anything* that learns `(real, imag) -> value` — a neural net, a closed-form approximation, a lookup scheme. The abstract base requires just two methods:\n\n- `fit(ctx)` — train within the time budget, pulling data and time info from the `FitContext` the harness passes in (its `sample()` draws uniform points and labels them via the ground truth; `expired()` / `time_left()` gate the 5-minute budget).\n- `predict(coords)` — map `(N, 2)` coords to `(N,)` values in `[0, 1]`, inference only.\n\n`TorchSolution` (below, lines 95-120) is the convenience base most solutions use: set `self.model` to an `nn.Module` and it supplies `predict` (clamped to `[0,1]`), `save`, and `load` for free. A solutions file just needs to expose a module-level `SOLUTION` instance or a `build()` factory.",
+      "file": "harness/interface.py",
+      "line": 68,
+      "endLine": 110
+    },
+    {
+      "title": "The metric: MSE over a fixed dense grid",
+      "content": "`harness/evaluate.py` is the immutable runner. It loads a solution, calls `fit` under a `SIGALRM` hard-kill backstop, then scores predictions on a fixed ~9.3M-point evaluation grid and appends a structured record to `runs.jsonl`.\n\nThe `score` function shown here is the judge. The **primary metric is `mse`** — mean squared error of predictions vs. ground truth; everything else is reported but secondary. `mae` is mean absolute error, `psnr` is the MSE expressed in dB (capped at 100 so a perfect fit stays valid JSON), and `boundary_mse` re-weights the error to emphasize the hard region near — but not inside — the set (`0.05 < target < 0.999`), which is where the fractal detail lives. Keeping this metric fixed is what makes runs comparable across the agent's entire search.",
+      "file": "harness/evaluate.py",
+      "line": 100,
+      "endLine": 111
+    },
+    {
+      "title": "The baseline: a plain coordinate MLP",
+      "content": "`solutions/baseline_mlp.py` is the canonical template — the floor every other approach tries to beat, and the file agents copy to start a new idea. It is deliberately simple: a 6-layer, 256-wide GELU MLP that maps coordinates straight to a value, with a final `tanh` rescaled to `[0, 1]`.\n\nThe `fit` loop (lines 36-50) is the pattern every solution follows: while `not ctx.expired()`, draw a batch with `ctx.sample()`, compute MSE loss, and step Adam. The last line, `SOLUTION = BaselineMLP()`, is the module-level handle the evaluator looks for. Note the weakness this baseline exposes: a plain MLP has a strong spectral bias and cannot represent the high-frequency boundary bands of the target — which motivates the next stop.",
+      "file": "solutions/baseline_mlp.py",
+      "line": 29,
+      "endLine": 53
+    },
+    {
+      "title": "A real research result: Fourier features",
+      "content": "`solutions/fourier_mlp.py` is an example of the kind of improvement the agent is meant to discover. The docstring diagnoses the baseline's failure precisely — the periodic log-distance target is \"dominated by HIGH-FREQUENCY content near the set boundary,\" which a plain MLP's spectral bias cannot fit.\n\nThe fix is **random Fourier features** (Tancik et al. 2020): coordinates are normalized to `~[-1, 1]`, projected through a fixed Gaussian matrix `B`, and lifted into `sin`/`cos` features before the MLP (the `forward` method, lines 47-51). This lets a standard network represent high frequencies. The most sensitive knob is `sigma`, the scale of `B` — too small underfits detail, too large overfits noise. This file also adds a wider 512-unit net, a cosine LR schedule, and larger batches versus the baseline.",
+      "file": "solutions/fourier_mlp.py",
+      "line": 29,
+      "endLine": 51
+    },
+    {
+      "title": "The dashboard: watching the agent compete with itself",
+      "content": "`dashboard/app.py` is a FastAPI app the human keeps open at `localhost:8000` to monitor the loop. It never writes to the research log, so it is safe to refresh mid-run.\n\n`runs_payload` is the core read: it parses every record from `runs.jsonl`, finds the **best** run by minimum `mse`, and computes a running-best `frontier` in log order so the UI can draw a progress curve of the agent improving over time. It also flags the `latest` run (the most recently appended record). Paired with an SSE `/api/stream` endpoint that polls the log's mtime and pushes updates the instant an experiment lands, this turns the autonomous research loop into a live leaderboard you can watch — closing the strange loop the README promised.",
+      "file": "dashboard/app.py",
+      "line": 57,
+      "endLine": 72
+    }
+  ]
+}

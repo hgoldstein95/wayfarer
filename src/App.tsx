@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { parseBlobUrl, tourRawUrl, type RepoLocation } from "./github";
+import {
+  parseBlobUrl,
+  parseRepoUrl,
+  tourRawUrl,
+  type RepoLocation,
+} from "./github";
 import { parseTour, type Tour } from "./types";
 import { Stop } from "./Stop";
 import { useTheme } from "./theme";
@@ -10,7 +15,7 @@ type LoadState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; tour: Tour; loc: RepoLocation };
+  | { status: "ready"; tour: Tour; fileLoc: RepoLocation };
 
 export function App() {
   const [state, setState] = useState<LoadState>({ status: "idle" });
@@ -39,7 +44,12 @@ export function App() {
         }
         const json = JSON.parse(await res.text());
         const tour = parseTour(json);
-        if (!cancelled) setState({ status: "ready", tour, loc });
+        // Stop files normally resolve against the tour's own repo, but a tour
+        // can name an `externalRepository` to explore a different repo instead.
+        const fileLoc = tour.externalRepository
+          ? parseRepoUrl(tour.externalRepository)
+          : loc;
+        if (!cancelled) setState({ status: "ready", tour, fileLoc });
       } catch (err) {
         if (!cancelled) {
           setState({
@@ -95,7 +105,7 @@ export function App() {
             )}
             <ol className="tour__stops">
               {state.tour.stops.map((stop, i) => (
-                <Stop key={i} stop={stop} index={i} loc={state.loc} />
+                <Stop key={i} stop={stop} index={i} loc={state.fileLoc} />
               ))}
             </ol>
           </article>
