@@ -27,7 +27,9 @@ export function App() {
     (async () => {
       try {
         const loc = parseBlobUrl(tourUrl);
-        const res = await fetch(tourRawUrl(loc));
+        // Revalidate rather than trust GitHub's 5-min raw cache, so an edited
+        // tour shows up on reload instead of being served stale.
+        const res = await fetch(tourRawUrl(loc), { cache: "no-cache" });
         if (!res.ok) {
           throw new Error(
             `Could not fetch tour file (HTTP ${res.status}). Check the URL and that the repo is public.`,

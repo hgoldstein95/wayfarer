@@ -27,7 +27,9 @@ export function Stop({ stop, index, loc }: Props) {
 
     (async () => {
       try {
-        const res = await fetch(stopRawUrl(loc, stop.file!));
+        const res = await fetch(stopRawUrl(loc, stop.file!), {
+          cache: "no-cache",
+        });
         if (!res.ok) {
           throw new Error(`HTTP ${res.status} fetching ${stop.file}`);
         }
