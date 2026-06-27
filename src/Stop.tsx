@@ -138,7 +138,7 @@ function CodeView({ lines, startLine, endLine }: CodeViewProps) {
           className="code__reveal code__reveal--up"
           onClick={() => setExpanded(true)}
         >
-          ▲ Show {hiddenAbove} line{hiddenAbove === 1 ? "" : "s"} above
+          ▲ {hiddenAbove} line{hiddenAbove === 1 ? "" : "s"} above
         </button>
       )}
 
@@ -175,7 +175,7 @@ function CodeView({ lines, startLine, endLine }: CodeViewProps) {
           className="code__reveal code__reveal--down"
           onClick={() => setExpanded(true)}
         >
-          ▼ Show {hiddenBelow} line{hiddenBelow === 1 ? "" : "s"} below
+          ▼ {hiddenBelow} line{hiddenBelow === 1 ? "" : "s"} below
         </button>
       )}
 
