@@ -32,8 +32,11 @@ type-check/CI gate — keep it green.
    with `parseTour` (`types.ts`), which throws human-readable errors.
 3. Each `Stop.tsx` renders its markdown `content` and, if the stop names a
    `file`, fetches that file (path resolved relative to the tour's `baseDir`
-   via `resolvePath`), tokenizes it with `highlightLines` (`highlight.ts`),
-   and renders it line-by-line in `CodeView`.
+   via `resolvePath`) once it scrolls near the viewport, tokenizes a window
+   around the snippet with `highlightLines` (`highlight.ts`), and renders it
+   line-by-line in `CodeView`. The fetch is deferred (IntersectionObserver) and
+   only the snippet window is tokenized up front; the full file is highlighted
+   lazily the first time the user expands.
 
 ## Key files
 
@@ -93,6 +96,15 @@ files change — update them when editing those files.
 - **No-flash theme boot.** An inline script in `index.html` sets
   `data-theme` before first paint from localStorage / `prefers-color-scheme`.
   `useTheme` reads that initial value — keep the two in sync.
+- **Lazy, windowed highlighting.** A stop fetches its file only when it scrolls
+  near the viewport, and tokenizes just `[line-CONTEXT_LINES … endLine]` (10
+  lines of lead-in, in `Stop.tsx`) rather than the whole file — so a tour over
+  many large files doesn't fetch and tokenize everything up front. The lead-in
+  is *not* displayed; it only gives Shiki preceding context so the snippet colors
+  are more likely correct (best-effort: a multi-line construct opening above the
+  window is still missed), and is sliced back off before render. Expanding
+  highlights the full file on demand, from the already-fetched text. Stops with
+  no `line` tokenize the whole file.
 - **Snippet highlight only when expanded.** Collapsed, every visible line is the
   snippet, so `CodeView` suppresses the highlight band; it appears only in the
   expanded view to distinguish focus lines from context.
