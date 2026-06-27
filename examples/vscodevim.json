@@ -1,7 +1,7 @@
 {
   "title": "VSCodeVim: How a keystroke becomes a Vim command",
   "description": "[VSCodeVim](https://github.com/VSCodeVim/Vim) is a Vim emulation layer for Visual Studio Code, written in TypeScript. This tour follows a single thread through the codebase: what happens between you pressing a key and VSCodeVim performing a Vim action.\n\nWe start at the extension's entry point, see how it hijacks VS Code's keyboard input, then walk through the mode system, the key-to-action dispatcher, and the registry that matches key sequences to actions. We finish with two concrete examples of those actions — a motion (`h`) and an operator (`d`) — and a look at how user-defined key remappings get a first crack at every keystroke.",
-  "externalRepository": "https://github.com/VSCodeVim/Vim",
+  "externalRepository": "https://github.com/VSCodeVim/Vim/tree/837580bbb5be9fb0ac0f5e140f0809be77412328",
   "stops": [
     {
       "title": "The entry point: activate()",

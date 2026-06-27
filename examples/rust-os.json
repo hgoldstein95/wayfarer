@@ -1,7 +1,7 @@
 {
   "title": "rust-os: A 1,000-Line RISC-V Kernel in Rust",
   "description": "`rust-os` is a Rust port of the [Operating System in 1,000 Lines](https://operating-system-in-1000-lines.vercel.app/en/) project, targeting 64-bit RISC-V running under QEMU.\n\nIt is a small but complete kernel: it boots from a hand-written assembly stub, sets up a heap and Sv39 virtual memory, talks to a virtio block device to read a tar-based filesystem, and runs user programs (a tiny shell) in user mode with cooperative multitasking and a handful of system calls.\n\nThis tour walks the path a reader needs to understand the whole thing: how the machine boots, how memory is managed, how processes are created and switched, how traps and syscalls cross the kernel/user boundary, and what a user program actually looks like. The repo is a Cargo workspace -- the `kernel/` crate is the OS itself, `common/` and `userlib/` are shared/user-side libraries, and `shell/` is the user program baked into the kernel image.",
-  "externalRepository": "https://github.com/aaronjeline/rust-os",
+  "externalRepository": "https://github.com/aaronjeline/rust-os/tree/85fb6a171dd021e9fd5861fb39dc5f33c1079d2b",
   "stops": [
     {
       "title": "The boot entry point",
