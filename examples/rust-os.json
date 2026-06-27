@@ -1,0 +1,70 @@
+{
+  "title": "rust-os: A 1,000-Line RISC-V Kernel in Rust",
+  "description": "`rust-os` is a Rust port of the [Operating System in 1,000 Lines](https://operating-system-in-1000-lines.vercel.app/en/) project, targeting 64-bit RISC-V running under QEMU.\n\nIt is a small but complete kernel: it boots from a hand-written assembly stub, sets up a heap and Sv39 virtual memory, talks to a virtio block device to read a tar-based filesystem, and runs user programs (a tiny shell) in user mode with cooperative multitasking and a handful of system calls.\n\nThis tour walks the path a reader needs to understand the whole thing: how the machine boots, how memory is managed, how processes are created and switched, how traps and syscalls cross the kernel/user boundary, and what a user program actually looks like. The repo is a Cargo workspace -- the `kernel/` crate is the OS itself, `common/` and `userlib/` are shared/user-side libraries, and `shell/` is the user program baked into the kernel image.",
+  "externalRepository": "https://github.com/aaronjeline/rust-os",
+  "stops": [
+    {
+      "title": "The boot entry point",
+      "content": "Execution starts here, not at `main`. The `boot` function is placed in the `.text.boot` linker section (see `os.ld`) so it lands at the address QEMU jumps to, and `#[unsafe(no_mangle)]` keeps its symbol name stable.\n\nThere is no runtime yet -- no stack, no zeroed memory. So `boot` is pure assembly: it loads the linker-defined `__stack_top` symbol into the stack pointer `sp`, then jumps to `main`. The `-> !` return type and `options(noreturn)` say this code never returns. Note `#![no_std]` / `#![no_main]` at the top of the file: this is a freestanding binary with no standard library and no normal entry point.",
+      "file": "kernel/src/main.rs",
+      "line": 27,
+      "endLine": 38
+    },
+    {
+      "title": "Kernel initialization in main",
+      "content": "Once we have a stack, `main` brings the system up step by step:\n\n- It zeroes the `.bss` section by hand (statics are assumed zero-initialized, but nobody has cleared that memory yet).\n- It installs the trap handler by writing `trap::trap_vector`'s address into the `stvec` CSR, so any exception or syscall jumps into our handler.\n- It initializes the `GLOBAL_ALLOCATOR` over the heap region between `__heap` and `__heap_end`, enabling `alloc`.\n- It brings up the virtio block device and mounts the tar `FileSystem` from it.\n- Finally it creates the shell process from the `SHELL` image, prints the process table with `ps()`, and calls `do_yield()` to hand control to it.\n\nThe trailing `loop {}` is the idle process: control returns here only when no user process is runnable.",
+      "file": "kernel/src/main.rs",
+      "line": 50,
+      "endLine": 78
+    },
+    {
+      "title": "The bump allocator",
+      "content": "The kernel's heap is the simplest allocator that works: a *bump* allocator. It keeps a single `next` pointer and an `end`; each allocation rounds `next` up to the requested alignment, checks it still fits before `end` (panicking with `Out of Memory!` otherwise), and advances `next`.\n\n`dealloc` does nothing -- memory is never freed (it just prints a cheeky message). That is fine for a kernel that allocates page tables and process structures once and runs forever. The `next`/`end` pair lives behind a `spin::Mutex` so the allocator is `Sync`, and it is registered as the program-wide `#[global_allocator]` at the bottom of the file, which is what makes `Box`, `Vec`, and `String` usable in this `no_std` kernel.",
+      "file": "kernel/src/allocator.rs",
+      "line": 30,
+      "endLine": 51
+    },
+    {
+      "title": "Sv39 virtual memory: walking and mapping pages",
+      "content": "RISC-V's Sv39 scheme translates a 39-bit virtual address through a three-level page table (the bit layout is diagrammed in the comments earlier in this file). `walk` descends that tree for a given `Vaddr`: at each level it indexes into the current table with `pt_index_for_level`, and if the entry is valid it follows it to the next-level table. When `alloc` is set and an intermediate table is missing, it allocates a fresh zeroed page and links it in -- this is how a new address space grows on demand.\n\n`map_page` is the public entry point: it asserts both the virtual and physical addresses are page-aligned, walks to the level-0 entry (allocating tables as needed), refuses to overwrite an existing mapping (`panic!(\"remap\")`), and finally installs a leaf PTE pointing at the physical frame with the requested `PageFlags`. The `PTE` and `PageFlags` types above encode the hardware bit layout (PPN fields plus the V/R/W/X/U permission bits).",
+      "file": "kernel/src/memory.rs",
+      "line": 185,
+      "endLine": 220
+    },
+    {
+      "title": "Creating a process and its address space",
+      "content": "`create_process` builds a runnable process from a raw program image. It claims a free slot in the process table, allocates a page for the process's root page table, and then constructs that process's virtual address space:\n\n- **Kernel mapping:** every page from `__kernel_start` up to `__heap_end` is identity-mapped (virtual address == physical address) with kernel RWX permissions, so the kernel is reachable in every process's address space.\n- **Device mapping:** the virtio block device's MMIO page is mapped read/write.\n- **User mapping:** the program image is copied page-by-page into freshly allocated frames, each mapped at `USER_BASE + offset` with full user RWXU permissions.\n\nAfter this (just below), the function fakes a saved-register frame on the process's stack so that the very first context switch \"returns\" into `user_entry`, and marks the process `Runnable`. The interesting design point: a process is just a page table plus a stack rigged to look like it was mid-context-switch.",
+      "file": "kernel/src/process.rs",
+      "line": 196,
+      "endLine": 243
+    },
+    {
+      "title": "Cooperative scheduling and the context switch",
+      "content": "This kernel is cooperatively scheduled: processes run until they voluntarily `do_yield()`. `find_next_process` (just above) round-robins through the process table for the next runnable process; `do_yield` then performs the switch in four steps:\n\n1. **Swap address spaces** -- it builds the `satp` value (mode-8 = Sv39, plus the next page table's physical page number) and writes it with `sfence.vma` fences around it to flush stale TLB entries.\n2. **Save the kernel stack** -- the top of the next process's stack goes into `sscratch`, where the trap handler will look for it.\n3. **Update `current`** in the scheduler.\n4. **Switch registers and stacks** by calling `switch_context` with pointers to the previous and next saved stack pointers.\n\nIf the chosen \"next\" process is already current, it skips all of this. The whole kernel runs on a single hart with no preemption, which is why no locking is needed around the switch itself.",
+      "file": "kernel/src/process.rs",
+      "line": 130,
+      "endLine": 165
+    },
+    {
+      "title": "switch_context: saving and restoring callee-saved registers",
+      "content": "This is the actual register-level context switch, written as a naked function so the compiler adds no prologue/epilogue. By the C calling convention, only callee-saved registers must be preserved across a call, so that is all it saves: it pushes `ra` and `s0`-`s11` onto the *current* stack, stores the updated stack pointer through `prev_sp` (`a0`), loads the new stack pointer from `next_sp` (`a1`), restores `ra` and `s0`-`s11` from the new stack, and `ret`s.\n\nBecause `ra` is restored from the new stack, the `ret` jumps to wherever that process last yielded -- or, for a brand-new process, to the `user_entry` address that `create_process` planted there. `user_entry` (just below) sets `sepc` to `USER_BASE` and `sret`s into user mode, which is how a fresh process starts executing its program.",
+      "file": "kernel/src/process.rs",
+      "line": 270,
+      "endLine": 312
+    },
+    {
+      "title": "Traps and system calls",
+      "content": "All exceptions and syscalls funnel through `trap_handler` (just above, line 190), which reads `scause` to classify the cause. A user program enters the kernel by executing `ecall`, which raises cause 8 (\"environment call\") and routes here to `handle_syscall`.\n\n`handle_syscall` reads the syscall number from register `x13` (`a3`) in the saved `TrapFrame`, converts it to the shared `Syscall` enum (defined in the `common` crate), and dispatches in `execute_syscall`:\n\n- `PUTCHAR` writes a byte from `a0` to the console via SBI.\n- `GETCHAR` reads a character and returns it in `a0`.\n- `EXIT` marks the current process exited and yields, never to return.\n\nAfterward it advances `sepc` past the 4-byte `ecall` instruction so the user program resumes at the following instruction. Any non-syscall cause (page faults, illegal instructions, interrupts) falls through to a descriptive `panic!`.",
+      "file": "kernel/src/trap.rs",
+      "line": 148,
+      "endLine": 186
+    },
+    {
+      "title": "Userland: the shell and the syscall interface",
+      "content": "Finally, the program that runs on top of all this. `shell` is a separate `no_std`/`no_main` crate, compiled and embedded into the kernel as `SHELL` (`include_bytes!(\"../../shell.bin\")` in `constants.rs`). Its `start` stub mirrors the kernel's boot: set up `sp`, call `main`, then `exit`.\n\n`main` is a REPL: it prints a prompt, reads characters one at a time with `get_char` (echoing them with `put_char`) until it sees a carriage return, then matches the buffer against `hello` and `exit`. Those `get_char`/`put_char`/`exit` calls come from `userlib`'s `syscall` module, where each wraps a single `ecall` with the arguments in `a0`-`a2` and the syscall number in `a3` -- exactly the convention the kernel's `handle_syscall` decodes. The shared `Syscall` enum in `common` is the contract both sides agree on, so the user and kernel halves of the boundary stay in sync.",
+      "file": "shell/src/main.rs",
+      "line": 27,
+      "endLine": 50
+    }
+  ]
+}
