@@ -1,0 +1,219 @@
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --code-bg: #0d1117;
+  --highlight: rgba(187, 128, 9, 0.18);
+  --highlight-border: #bb8009;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+.app__header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.app__brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text);
+}
+.app__brand:hover {
+  text-decoration: none;
+  color: var(--accent);
+}
+.app__tour-title {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.app__main {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 6rem;
+}
+
+.notice {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+}
+.notice--error {
+  border-color: #6e2b2b;
+  background: #2d1414;
+  color: #ffb4b4;
+}
+
+/* Landing */
+.landing h1 {
+  font-size: 2rem;
+  margin-bottom: 0.25rem;
+}
+.landing__example {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+}
+
+/* Tour */
+.tour__title {
+  font-size: 2rem;
+  margin: 0 0 0.5rem;
+}
+.tour__intro {
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1.5rem;
+  margin-bottom: 1rem;
+}
+.tour__stops {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Stop */
+.stop {
+  padding: 2rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.stop__title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.35rem;
+  margin: 0 0 0.75rem;
+}
+.stop__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #0d1117;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.stop__content {
+  margin-bottom: 1.25rem;
+}
+.stop__code {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.stop__filebar {
+  padding: 0.5rem 0.9rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+}
+.stop__codebody {
+  margin: 0;
+  max-height: 520px;
+  overflow: auto;
+}
+
+/* Shiki output */
+.stop__codebody pre.shiki {
+  margin: 0;
+  padding: 0.9rem 0;
+  background: var(--code-bg) !important;
+  font-size: 0.85rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  counter-reset: line;
+}
+.stop__codebody pre.shiki code {
+  display: block;
+}
+.stop__codebody .line {
+  display: inline-block;
+  width: 100%;
+  padding: 0 1rem;
+}
+.stop__codebody .line--highlighted {
+  background: var(--highlight);
+  box-shadow: inset 3px 0 0 var(--highlight-border);
+}
+
+/* Markdown */
+.markdown :first-child {
+  margin-top: 0;
+}
+.markdown :last-child {
+  margin-bottom: 0;
+}
+.markdown code {
+  background: var(--panel);
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.markdown pre {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.9rem;
+  overflow-x: auto;
+}
+.markdown pre code {
+  background: none;
+  padding: 0;
+}
+.markdown blockquote {
+  margin: 0;
+  padding-left: 1rem;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+.markdown a {
+  text-decoration: underline;
+}
+.markdown table {
+  border-collapse: collapse;
+}
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.7rem;
+}

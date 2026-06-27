@@ -1,0 +1,27 @@
+{
+  "title": "Wayfarer: a quick self-tour",
+  "description": "This example tour walks through Wayfarer's own source. Point the app at this file's GitHub blob URL to see it rendered.",
+  "stops": [
+    {
+      "title": "Parsing the tour URL",
+      "file": "../src/github.ts",
+      "line": 24,
+      "endLine": 33,
+      "content": "Every tour starts from a GitHub **blob URL** passed as `?tour=`. We pull `owner`, `repo`, `branch`, and the file path out of it, and remember the tour file's directory as `baseDir` so relative paths resolve correctly."
+    },
+    {
+      "title": "Resolving relative file paths",
+      "file": "../src/github.ts",
+      "line": 113,
+      "endLine": 132,
+      "content": "Stop `file` paths are relative to the tour file's directory. `resolvePath` joins them against `baseDir` and collapses `.` / `..` segments, so a stop can reference `../src/index.ts` and we still fetch the right raw file."
+    },
+    {
+      "title": "Rendering a stop",
+      "file": "../src/Stop.tsx",
+      "line": 62,
+      "endLine": 89,
+      "content": "Each stop renders its markdown `content`, then — if it names a `file` — fetches that file's raw contents, syntax-highlights it with Shiki, and emphasizes the `line`..`endLine` range."
+    }
+  ]
+}
