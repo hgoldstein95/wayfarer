@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import { parseBlobUrl, tourRawUrl, type RepoLocation } from "./github";
 import { parseTour, type Tour } from "./types";
 import { Stop } from "./Stop";
+import { useTheme } from "./theme";
 
 type LoadState =
   | { status: "idle" }
@@ -13,6 +14,7 @@ type LoadState =
 
 export function App() {
   const [state, setState] = useState<LoadState>({ status: "idle" });
+  const { theme, toggle } = useTheme();
 
   useEffect(() => {
     const tourUrl = new URLSearchParams(window.location.search).get("tour");
@@ -62,6 +64,14 @@ export function App() {
         {state.status === "ready" && (
           <span className="app__tour-title">{state.tour.title}</span>
         )}
+        <button
+          className="app__theme-toggle"
+          onClick={toggle}
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+        >
+          {theme === "dark" ? "☀" : "☾"}
+        </button>
       </header>
 
       <main className="app__main">

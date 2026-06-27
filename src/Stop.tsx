@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { blobLink, stopRawUrl, type RepoLocation } from "./github";
@@ -155,7 +155,12 @@ function CodeView({ lines, startLine, endLine }: CodeViewProps) {
                 className={"codeline" + (inRange ? " codeline--hl" : "")}
               >
                 {line.tokens.map((t, j) => (
-                  <span key={j} style={{ color: t.color }}>
+                  <span
+                    key={j}
+                    style={
+                      { "--cl": t.light, "--cd": t.dark } as CSSProperties
+                    }
+                  >
                     {t.content}
                   </span>
                 ))}

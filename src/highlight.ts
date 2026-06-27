@@ -4,10 +4,11 @@ import {
   type SpecialLanguage,
 } from "shiki";
 
-/** A single highlighted token: its text and resolved color. */
+/** A single highlighted token: its text and resolved light/dark colors. */
 export interface Token {
   content: string;
-  color: string;
+  light: string;
+  dark: string;
 }
 
 /** One line of code as a list of colored tokens (empty for a blank line). */
@@ -82,8 +83,20 @@ export async function highlightLines(
   file: string,
 ): Promise<CodeLine[]> {
   const lang = languageForFile(file);
-  const { tokens } = await codeToTokens(code, { lang, theme: "github-dark" });
+  const { tokens } = await codeToTokens(code, {
+    lang,
+    themes: { light: "github-light", dark: "github-dark" },
+  });
   return tokens.map((line) => ({
-    tokens: line.map((t) => ({ content: t.content, color: t.color ?? "inherit" })),
+    tokens: line.map((t) => {
+      // With dual themes, Shiki puts both colors on `htmlStyle` as
+      // { color: <light>, "--shiki-dark": <dark> }.
+      const style = (t.htmlStyle ?? {}) as Record<string, string>;
+      return {
+        content: t.content,
+        light: style.color ?? "inherit",
+        dark: style["--shiki-dark"] ?? style.color ?? "inherit",
+      };
+    }),
   }));
 }
