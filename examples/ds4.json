@@ -1,0 +1,126 @@
+{
+  "title": "DwarfStar (ds4): a native DeepSeek V4 inference engine",
+  "description": "A walk through **DwarfStar**, antirez's self-contained C inference engine built specifically for DeepSeek V4 Flash/PRO. It is deliberately narrow: not a generic GGUF runner, but one model done end to end — loading, MLA attention, routed-MoE with 2-bit experts, an on-disk KV cache, SSD weight streaming, distributed inference, an OpenAI/Anthropic-compatible server, and an integrated coding agent.\n\nThis tour assumes the tour file lives at the repo root, so paths are given relative to it. Line numbers track `main` at the time of writing and may drift as the code evolves.",
+  "externalRepository": "https://github.com/antirez/ds4",
+  "stops": [
+    {
+      "title": "What this is",
+      "content": "DwarfStar is a single-model inference engine: optimized first for **DeepSeek V4 Flash**, with PRO support on very-high-memory machines. The bet is explicit — one model at a time, validated against official logits, with just enough agent integration to know it actually works. The supported backends are Metal (primary), CUDA/DGX Spark, and ROCm (Strix Halo). The CPU path exists only for correctness checks.",
+      "file": "README.md",
+      "line": 1,
+      "endLine": 18
+    },
+    {
+      "title": "The public boundary: engine vs session",
+      "content": "Everything outside `ds4.c` is meant to see only two opaque types. **`ds4_engine`** is the loaded model (weights, tokenizer, backend). **`ds4_session`** is one mutable inference timeline that owns the live KV cache and logits. Callers never touch tensors — they hand over full token prefixes and let the session reuse, extend, or rebuild graph state. Keeping this header narrow is what lets the CLI, server, and agent stay decoupled from the inference internals.",
+      "file": "ds4.h",
+      "line": 11,
+      "endLine": 18
+    },
+    {
+      "title": "How a model is configured",
+      "content": "`ds4_engine_options` is the full surface for opening a model. Note how much of the project's thesis lives right here as plain fields: `mtp_*` (multi-token-prediction speculative decoding), `ssd_streaming_*` (run from disk when RAM is short), `directional_steering_*`, `load_slice`/`load_layer_start`/`load_layer_end` (load only part of the model — used by distributed runs), and the nested `distributed` options.",
+      "file": "ds4.h",
+      "line": 89,
+      "endLine": 121
+    },
+    {
+      "title": "Model shape: Flash vs PRO",
+      "content": "The architecture dimensions aren't hardcoded constants — they're macros reading a `g_ds4_shape` global that's selected at load time from the GGUF. This indirection is what lets the same code path serve both Flash and PRO: layer count, embedding width, the expert count, and how many experts are routed per token all come from the active shape.",
+      "file": "ds4.c",
+      "line": 290,
+      "endLine": 306
+    },
+    {
+      "title": "The model struct",
+      "content": "`ds4_model` is the in-memory representation the engine builds from the GGUF: tokenizer tables, per-layer weight pointers, and the metadata needed to drive the graph. Most fields are pointers into mmap'd weight regions rather than owned copies, which is what makes SSD streaming and partial loads possible later.",
+      "file": "ds4.c",
+      "line": 1616,
+      "endLine": 1630
+    },
+    {
+      "title": "Entry point: the CLI",
+      "content": "`ds4`'s CLI `main` is the simplest consumer of the engine API and a good map of the lifecycle: parse args, `ds4_engine_open()`, build a prompt, create a session, then loop sampling tokens. The server and agent are larger but follow the same engine/session contract.",
+      "file": "ds4_cli.c",
+      "line": 1637,
+      "endLine": 1707
+    },
+    {
+      "title": "Opening the engine",
+      "content": "`ds4_engine_open()` is where a GGUF becomes a runnable model: it reads the file, selects the model shape, wires up the chosen backend, and prepares weights (including streaming/partial-load modes). This is the one heavy, stateful constructor behind the whole API — everything after it is sessions running against an already-loaded engine.",
+      "file": "ds4.c",
+      "line": 25546,
+      "endLine": 25560
+    },
+    {
+      "title": "Prefix reuse: ds4_session_sync",
+      "content": "This is the heart of why sessions exist. `ds4_session_sync()` is given a full prompt prefix; if the live checkpoint is already a prefix of it, only the new suffix is evaluated, otherwise the state is refilled from scratch. The prefill is chunked (`prefill_chunk`) so long prompts can report progress and be cancelled at safe checkpoint boundaries. Cheap turn-to-turn continuation in a chat falls directly out of this design.",
+      "file": "ds4.c",
+      "line": 26698,
+      "endLine": 26712
+    },
+    {
+      "title": "MLA attention",
+      "content": "DeepSeek V4's attention uses a compressed (latent) KV representation — the reason huge contexts stay practical. `layer_attention_one` is the per-token CPU reference path. Just below it, `layer_grouped_out_one` shows the grouped output projection: heads are first mapped to a low-rank vector per group, then projected back to the full embedding width. The GPU graphs mirror this; the CPU path is the readable spec.",
+      "file": "ds4.c",
+      "line": 7085,
+      "endLine": 7100
+    },
+    {
+      "title": "Routed Mixture-of-Experts",
+      "content": "`layer_routed_moe_one` runs one token through the MoE FFN: a gate selects the top-k experts (`DS4_N_EXPERT_USED` of `DS4_N_EXPERT`), then only those experts' gate/up/down projections are evaluated and combined by weight. Because only a few experts fire per token, the routed experts dominate model size but not per-token compute — which is exactly what the quantization strategy exploits.",
+      "file": "ds4.c",
+      "line": 7437,
+      "endLine": 7454
+    },
+    {
+      "title": "2-bit experts, asymmetric quant",
+      "content": "The routed experts carry the aggressive quantization: up/gate at IQ2_XXS, down at Q2_K, while shared experts, projections, and routing stay high-precision. These `matvec_*_expert*` kernels are the hot inner loops that multiply a hidden vector against quantized expert rows directly in their packed format (prequant scratch avoids re-dequantizing). This is where '2-bit but still reliable at tool calling' is actually earned.",
+      "file": "ds4.c",
+      "line": 5707,
+      "endLine": 5760
+    },
+    {
+      "title": "The KV cache is a disk citizen",
+      "content": "A central idea: compressed KV caches plus fast SSDs mean the KV cache no longer has to live in RAM. The kvstore keys a checkpoint by the SHA of its **rendered byte prefix** (not the token sequence), so the lookup answers 'do I have state for the bytes at the front of this prompt?'. The payload still carries exact tokens and graph state. `model_id` lives in a previously-reserved header byte so old Flash cache files stay compatible.",
+      "file": "ds4_kvstore.h",
+      "line": 36,
+      "endLine": 60
+    },
+    {
+      "title": "SSD weight streaming",
+      "content": "Streaming turns 'does the model fit in RAM?' from a hard cutoff into a speed spectrum. `ds4_ssd_cache_plan` and `ds4_ssd_auto_cache_plan` decide how many routed experts to keep resident given a byte budget; the rest are paged from disk on demand. Combined with the asymmetric quant (routed experts are most of the bytes), this is what lets a 96/128 GB machine run a model larger than its RAM.",
+      "file": "ds4_ssd.h",
+      "line": 6,
+      "endLine": 32
+    },
+    {
+      "title": "Distributed inference: layer slices",
+      "content": "For PRO Q4 split across two machines, each node loads a contiguous range of layers (the `load_slice` options from earlier). These low-level entry points evaluate just `[layer_start, layer_end)` and pass the hidden state across the wire as an activation vector; one node also runs the output head. The transport, session routing, and coordinator/worker handshake all live in `ds4_distributed.c`.",
+      "file": "ds4.h",
+      "line": 280,
+      "endLine": 296
+    },
+    {
+      "title": "The server: OpenAI- and Anthropic-compatible",
+      "content": "`ds4-server` speaks several APIs off one engine. The request dispatcher routes `POST /v1/messages` to the Anthropic parser, `/v1/chat/completions` and `/v1/responses` to the OpenAI-style parsers, then funnels all of them into one internal `request` that drives a session. Speaking the wire formats coding agents already expect is what makes the engine usable by real tools out of the box.",
+      "file": "ds4_server.c",
+      "line": 11285,
+      "endLine": 11300
+    },
+    {
+      "title": "The integrated coding agent",
+      "content": "`ds4-agent` is a coding agent built for this model. Rather than JSON function-calling, it teaches the model a native **DSML** tool syntax (`<｜DSML｜tool_calls>` / `invoke` / `parameter`) embedded in the system prompt, then parses those blocks out of the generation stream to run file and shell tools. Tool calls are explicitly disallowed inside `<think>`. This is the 'does it really work end to end' validation loop the README keeps pointing at.",
+      "file": "ds4_agent.c",
+      "line": 707,
+      "endLine": 720
+    },
+    {
+      "title": "Borrowed building blocks",
+      "content": "Two well-worn antirez libraries ride along. `rax` is a radix tree used for prefix-keyed lookups, and `linenoise` is the tiny line-editing library powering the interactive prompt — its banner ('against the idea that a line editing lib needs to be 20,000 lines of C') is a fair summary of the whole project's taste: small, self-contained, no heavy dependencies.",
+      "file": "linenoise.h",
+      "line": 1,
+      "endLine": 6
+    }
+  ]
+}
