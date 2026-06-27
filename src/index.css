@@ -167,6 +167,9 @@ a:hover {
 .codeline {
   padding: 0 1rem;
   white-space: pre;
+  /* Give blank lines a full row height so a highlighted empty line renders a
+     continuous band instead of a gap. */
+  min-height: 1.5em;
 }
 .codeline--hl {
   background: var(--highlight);
