@@ -146,7 +146,9 @@ function CodeView({ lines, startLine, endLine }: CodeViewProps) {
         <div className="code__lines">
           {lines.slice(visibleFrom - 1, visibleTo).map((line, i) => {
             const lineNo = visibleFrom + i;
-            const inRange = lineNo >= from && lineNo <= to;
+            // Only emphasize the range when expanded; collapsed, every visible
+            // line is the snippet so the highlight adds nothing.
+            const inRange = !collapsed && lineNo >= from && lineNo <= to;
             const isFirstInRange = lineNo === from;
             return (
               <div
