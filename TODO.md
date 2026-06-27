@@ -1,2 +1,0 @@
-- Comments
-- Allow a tour to refer to an external repo
