@@ -12,15 +12,15 @@
     {
       "title": "Resolving relative file paths",
       "file": "../src/github.ts",
-      "line": 93,
-      "endLine": 109,
+      "line": 130,
+      "endLine": 146,
       "content": "Stop `file` paths are relative to the tour file's directory. `resolvePath` joins them against `baseDir` and collapses `.` / `..` segments, so a stop can reference `../src/index.ts` and we still fetch the right raw file."
     },
     {
       "title": "Fetching and highlighting the file",
       "file": "../src/Stop.tsx",
-      "line": 28,
-      "endLine": 36,
+      "line": 62,
+      "endLine": 110,
       "content": "When a stop names a `file`, an effect fetches that file's raw contents from GitHub, syntax-highlights it with Shiki, and emphasizes the `line`..`endLine` range — then the result is rendered into the stop's code panel."
     }
   ]

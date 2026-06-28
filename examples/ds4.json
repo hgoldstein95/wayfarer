@@ -21,7 +21,7 @@
       "title": "How a model is configured",
       "content": "`ds4_engine_options` is the full surface for opening a model. Note how much of the project's thesis lives right here as plain fields: `mtp_*` (multi-token-prediction speculative decoding), `ssd_streaming_*` (run from disk when RAM is short), `directional_steering_*`, `load_slice`/`load_layer_start`/`load_layer_end` (load only part of the model — used by distributed runs), and the nested `distributed` options.",
       "file": "ds4.h",
-      "line": 89,
+      "line": 94,
       "endLine": 121
     },
     {
@@ -35,8 +35,8 @@
       "title": "The model struct",
       "content": "`ds4_model` is the in-memory representation the engine builds from the GGUF: tokenizer tables, per-layer weight pointers, and the metadata needed to drive the graph. Most fields are pointers into mmap'd weight regions rather than owned copies, which is what makes SSD streaming and partial loads possible later.",
       "file": "ds4.c",
-      "line": 1616,
-      "endLine": 1630
+      "line": 3016,
+      "endLine": 3062
     },
     {
       "title": "Entry point: the CLI",

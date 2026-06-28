@@ -36,7 +36,7 @@
       "content": "Actions register themselves at import time with the `@RegisterAction` decorator, which drops each action class into `actionMap`, keyed by every `Mode` it supports.\n\n`getRelevantAction` then does the matching: it walks the actions registered for the current mode, constructs each one, and asks `doesActionApply` (an exact match) or `couldActionApply` (a prefix match). An exact match wins immediately; otherwise, if any action *could* still match with more keys, it returns `WaitingOnKeys`; if none could, `NoPossibleMatch`. The `TODO` cheerfully admits that rebuilding hundreds of action objects on every keystroke is wasteful.",
       "file": "src/actions/base.ts",
       "line": 257,
-      "endLine": 296
+      "endLine": 297
     },
     {
       "title": "A motion: moving left with 'h'",
@@ -50,7 +50,7 @@
       "content": "Motions move the cursor; operators act on a range of text. `DeleteOperator` is bound to `d` and, per its `modes`, is valid in `Normal` and both visual modes. In normal mode it pairs with a motion — `dw`, `d$` — to define the `start`/`end` range its `run` method receives.\n\nNotice the Vim-faithful details: line-wise deletes (`dd`) snap the range to whole lines, and there's careful handling of the trailing newline character, which Vim conceptually places one past the end of a line. The deleted text is also yanked into a register before removal.",
       "file": "src/actions/operator.ts",
       "line": 99,
-      "endLine": 130
+      "endLine": 157
     },
     {
       "title": "User remappings get first dibs",
