@@ -26,10 +26,15 @@ type-check/CI gate — keep it green.
 
 ## Architecture / data flow
 
-1. `App.tsx` reads `?tour=` and calls `parseBlobUrl` (`github.ts`) to derive
-   `{owner, repo, branch, path, baseDir}` from the GitHub blob (or raw) URL.
-2. It fetches the tour JSON from `raw.githubusercontent.com` and validates it
-   with `parseTour` (`types.ts`), which throws human-readable errors.
+1. `App.tsx` reads `?tour=` and calls `parseTourUrl` (`github.ts`). A GitHub
+   blob/raw URL yields a `RepoLocation` (`{owner, repo, branch, path, baseDir}`)
+   and is fetched from `raw.githubusercontent.com`; any other URL is fetched
+   directly (`repo: null`) so a tour can be served from a local/private static
+   server for tight-loop authoring without pushing to GitHub.
+2. It fetches the tour JSON and validates it with `parseTour` (`types.ts`),
+   which throws human-readable errors. A tour loaded from a non-GitHub URL has
+   no repo of its own, so it must set `externalRepository` to locate its source
+   files — `App.tsx` errors if it doesn't.
 3. Each `Stop.tsx` renders its markdown `content` and, if the stop names a
    `file`, fetches that file (path resolved relative to the tour's `baseDir`
    via `resolvePath`) once it scrolls near the viewport, tokenizes a window

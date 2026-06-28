@@ -202,3 +202,29 @@ To preview, host the file on GitHub and open Wayfarer with its blob URL:
 ```
 http://localhost:8000/?tour=https://github.com/owner/repo/blob/main/path/to/tour.json
 ```
+
+### Previewing without pushing to GitHub
+
+Pushing to a public repo on every edit is a slow authoring loop. The `?tour=`
+parameter accepts **any URL**, not just a GitHub one, so you can serve the tour
+JSON from your own machine and iterate against a hosted Wayfarer instance
+without running the app yourself.
+
+1. Add `externalRepository` to your tour pointing at the public repo whose
+   source files the stops reference. This is **required** when the tour isn't
+   loaded from GitHub — that's the only thing telling Wayfarer where the source
+   files live. (Source files still come from GitHub; only the tour JSON is
+   local.)
+2. Serve the tour file's directory locally with CORS enabled, e.g.
+   `npx serve --cors` or `npx http-server --cors`.
+3. Open the hosted app with a `?tour=` pointing at your local server:
+
+   ```
+   https://wayfarer.example.com/?tour=http://localhost:3000/tour.json
+   ```
+
+Now editing `tour.json` and reloading the page shows the change immediately — no
+commit, no push. Two constraints on the server: it must send CORS headers
+allowing the Wayfarer origin (the `--cors` flags above do this), and it must be
+`https` or `localhost` (browsers block plain-`http` fetches from an `https`
+page, but exempt `localhost`).

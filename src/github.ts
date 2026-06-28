@@ -17,6 +17,50 @@ export interface RepoLocation {
   baseDir: string;
 }
 
+/** Where to fetch a tour JSON from, plus the repo it lives in (if any). */
+export interface TourLocation {
+  /** URL to fetch the raw tour JSON from. */
+  fetchUrl: string;
+  /**
+   * The repo the tour file lives in, when it's GitHub-hosted. Used to resolve
+   * stop `file` paths when the tour doesn't set `externalRepository`. It's
+   * `null` for a tour served from an arbitrary URL — such a tour has no repo
+   * context, so it must declare `externalRepository` to locate its files.
+   */
+  repo: RepoLocation | null;
+}
+
+const GITHUB_HOSTS = new Set([
+  "github.com",
+  "www.github.com",
+  "raw.githubusercontent.com",
+]);
+
+/**
+ * Resolve a `?tour=` value to where the JSON is fetched from.
+ *
+ * A GitHub blob/raw URL is parsed into a `RepoLocation` and behaves as before
+ * (stop files resolve relative to the tour, unless `externalRepository` says
+ * otherwise). Any other URL is fetched directly — handy for prototyping a tour
+ * against a local or private static server without pushing to GitHub. Such a
+ * tour has no repo of its own, so its stop files must resolve via
+ * `externalRepository` (enforced in App.tsx). The server hosting it must send
+ * CORS headers allowing this app's origin, and be https or localhost.
+ */
+export function parseTourUrl(input: string): TourLocation {
+  let url: URL;
+  try {
+    url = new URL(input);
+  } catch {
+    throw new Error(`"${input}" is not a valid URL.`);
+  }
+  if (GITHUB_HOSTS.has(url.hostname)) {
+    const repo = parseBlobUrl(input);
+    return { fetchUrl: tourRawUrl(repo), repo };
+  }
+  return { fetchUrl: input, repo: null };
+}
+
 /** Parse a github.com/.../blob/... URL into its components. */
 export function parseBlobUrl(input: string): RepoLocation {
   let url: URL;

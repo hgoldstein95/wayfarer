@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import {
-  parseBlobUrl,
-  parseRepoUrl,
-  tourRawUrl,
-  type RepoLocation,
-} from "./github";
+import { parseRepoUrl, parseTourUrl, type RepoLocation } from "./github";
 import { parseTour, type Tour } from "./types";
 import { Stop } from "./Stop";
 import { useTheme } from "./theme";
@@ -33,22 +28,29 @@ export function App() {
 
     (async () => {
       try {
-        const loc = parseBlobUrl(tourUrl);
+        const loc = parseTourUrl(tourUrl);
         // Revalidate rather than trust GitHub's 5-min raw cache, so an edited
         // tour shows up on reload instead of being served stale.
-        const res = await fetch(tourRawUrl(loc), { cache: "no-cache" });
+        const res = await fetch(loc.fetchUrl, { cache: "no-cache" });
         if (!res.ok) {
           throw new Error(
-            `Could not fetch tour file (HTTP ${res.status}). Check the URL and that the repo is public.`,
+            `Could not fetch tour file (HTTP ${res.status}). Check the URL and that the repo (or server) is public.`,
           );
         }
         const json = JSON.parse(await res.text());
         const tour = parseTour(json);
         // Stop files normally resolve against the tour's own repo, but a tour
         // can name an `externalRepository` to explore a different repo instead.
+        // A tour served from a non-GitHub URL has no repo of its own, so it
+        // must declare externalRepository to say where its files live.
         const fileLoc = tour.externalRepository
           ? parseRepoUrl(tour.externalRepository)
-          : loc;
+          : loc.repo;
+        if (!fileLoc) {
+          throw new Error(
+            'This tour was loaded from a non-GitHub URL, so it must set "externalRepository" to a public github.com/owner/repo URL so its source files can be found.',
+          );
+        }
         if (!cancelled) setState({ status: "ready", tour, fileLoc });
       } catch (err) {
         if (!cancelled) {
