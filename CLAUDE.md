@@ -106,8 +106,11 @@ files change — update them when editing those files.
   is *not* displayed; it only gives Shiki preceding context so the snippet colors
   are more likely correct (best-effort: a multi-line construct opening above the
   window is still missed), and is sliced back off before render. Expanding
-  highlights the full file on demand, from the already-fetched text. Stops with
-  no `line` tokenize the whole file.
+  highlights a bounded window — `EXPAND_MARGIN` (50) lines on each side of the
+  snippet, never the whole file — from the already-fetched text; past that the
+  view links out to GitHub rather than growing further (so there's no
+  nested-scroll cap and no thousand-line wall). Stops with no `line` tokenize the
+  whole file.
 - **Snippet highlight only when expanded.** Collapsed, every visible line is the
   snippet, so `CodeView` suppresses the highlight band; it appears only in the
   expanded view to distinguish focus lines from context.

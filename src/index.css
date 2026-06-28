@@ -42,6 +42,11 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Stop iOS Safari from inflating body text in landscape. */
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -70,6 +75,7 @@ a:hover {
   border-bottom: 1px solid var(--border);
 }
 .app__brand {
+  flex: none;
   font-weight: 700;
   font-size: 1.1rem;
   color: var(--text);
@@ -79,6 +85,13 @@ a:hover {
   color: var(--accent);
 }
 .app__tour-title {
+  /* Take the leftover space and truncate, so a long title can't wrap and bloat
+     the sticky header (which then eats vertical space on a phone). */
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted);
   font-size: 0.9rem;
 }
@@ -235,10 +248,6 @@ a:hover {
 .code__scroll {
   overflow-x: auto;
 }
-.code__scroll--capped {
-  max-height: 520px;
-  overflow-y: auto;
-}
 .code__lines {
   padding: 0.5rem 0;
   font-size: 0.85rem;
@@ -295,6 +304,12 @@ a:hover {
 }
 
 /* Markdown */
+.markdown {
+  /* Break long unbroken tokens (URLs, paths, inline code) instead of letting
+     them force the whole page to scroll sideways on a phone. overflow-wrap is
+     inherited, so this reaches inline code and links too. */
+  overflow-wrap: anywhere;
+}
 .markdown :first-child {
   margin-top: 0;
 }
@@ -335,4 +350,34 @@ a:hover {
 .markdown td {
   border: 1px solid var(--border);
   padding: 0.4rem 0.7rem;
+}
+
+/* Phones: tighten spacing to reclaim horizontal room, grow tap targets to the
+   ~44px touch guideline, and shrink the largest headings a touch. */
+@media (max-width: 600px) {
+  .app__header {
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+  }
+  .app__theme-toggle {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+  .app__main {
+    padding: 1.5rem 1rem 4rem;
+  }
+  .tour__title,
+  .landing h1 {
+    font-size: 1.6rem;
+  }
+  .stop {
+    padding: 1.5rem 0;
+  }
+  .stop__title {
+    font-size: 1.2rem;
+  }
+  .code__reveal {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+  }
 }
