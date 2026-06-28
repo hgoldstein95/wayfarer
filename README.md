@@ -31,6 +31,7 @@ A tour is a JSON file:
 {
   "title": "My Tour",
   "description": "Optional markdown intro.",
+  "externalRepository": "https://github.com/owner/repo/tree/<commit>",
   "stops": [
     {
       "title": "Stop title",
@@ -43,22 +44,33 @@ A tour is a JSON file:
 }
 ```
 
-| Field         | Where   | Meaning                                                            |
-| ------------- | ------- | ----------------------------------------------------------------- |
-| `title`       | tour    | Tour heading (required).                                           |
-| `description` | tour    | Optional markdown intro shown before the stops.                   |
-| `stops`       | tour    | Ordered list of stops (required).                                 |
-| `title`       | stop    | Stop heading (required).                                           |
-| `content`     | stop    | Markdown body, GFM supported (required).                          |
-| `file`        | stop    | File to display, **relative to the tour file's directory**.       |
-| `line`        | stop    | 1-based start line to emphasize (optional).                       |
-| `endLine`     | stop    | 1-based end line to emphasize (defaults to `line`).               |
+| Field                | Where | Meaning                                                          |
+| -------------------- | ----- | ---------------------------------------------------------------- |
+| `title`              | tour  | Tour heading (required).                                         |
+| `description`        | tour  | Optional markdown intro shown before the stops.                 |
+| `externalRepository` | tour  | Optional `github.com/owner/repo[/tree/ref]`; see below.         |
+| `stops`              | tour  | Ordered list of stops (required).                                |
+| `title`              | stop  | Stop heading (required).                                         |
+| `content`            | stop  | Markdown body, GFM supported (required).                         |
+| `file`               | stop  | File to display (optional; relative to the tour file's dir).     |
+| `line`               | stop  | 1-based start line to emphasize (optional).                     |
+| `endLine`            | stop  | 1-based end line to emphasize (defaults to `line`).             |
 
 Relative `file` paths (including `../`) resolve against the directory the tour
-file lives in, so tours are self-contained and portable within a repo.
+file lives in, so tours are self-contained and portable within a repo. Set
+`externalRepository` and the stop `file` paths instead resolve from the **root of
+that repo**, letting a tour hosted in one repo explore a different one (pin a
+commit SHA with `/tree/<sha>` so line numbers don't drift). A stop with no `file`
+is a prose-only stop.
 
-See [`examples/tour.json`](examples/tour.json) for a working tour of this repo's
-own source.
+The [`examples/`](examples) directory has working tours: a self-tour of this repo
+([`tour.json`](examples/tour.json)) plus tours of external projects
+([`rust-os.json`](examples/rust-os.json),
+[`vscodevim.json`](examples/vscodevim.json), [`ds4.json`](examples/ds4.json)).
+
+**Writing a tour?** See [`AUTHORING.md`](AUTHORING.md) for the full format
+reference and advice on putting together a good tour — it's also the file to
+point an agent at when generating one.
 
 ## How it works
 

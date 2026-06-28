@@ -56,6 +56,9 @@ type-check/CI gate — keep it green.
 
 ## Tour JSON format
 
+`AUTHORING.md` is the full, human/agent-facing reference for this format and how
+to write a good tour — keep it in sync when the format changes.
+
 ```json
 {
   "title": "string (required)",

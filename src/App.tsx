@@ -115,23 +115,76 @@ export function App() {
   );
 }
 
+const REPO = "https://github.com/hgoldstein95/wayfarer";
+
+const EXAMPLES = [
+  {
+    file: "examples/tour.json",
+    title: "Wayfarer: a quick self-tour",
+    blurb: "A tour of this app’s own source — the shortest way to see the idea.",
+  },
+  {
+    file: "examples/rust-os.json",
+    title: "A 1,000-line RISC-V kernel in Rust",
+    blurb: "Boot, virtual memory, processes, and syscalls in a tiny OS.",
+  },
+  {
+    file: "examples/vscodevim.json",
+    title: "How a keystroke becomes a Vim command",
+    blurb: "One thread through VSCodeVim, from key event to action.",
+  },
+  {
+    file: "examples/ds4.json",
+    title: "A native DeepSeek V4 inference engine",
+    blurb: "antirez’s self-contained C inference engine, end to end.",
+  },
+];
+
+/** In-app link that opens a tour given its GitHub blob URL. */
+function tourHref(file: string): string {
+  return `?tour=${encodeURIComponent(`${REPO}/blob/main/${file}`)}`;
+}
+
 function Landing() {
   const example =
     "?tour=https://github.com/owner/repo/blob/main/path/to/tour.json";
   return (
     <div className="landing">
       <h1>Wayfarer</h1>
-      <p>Render a code tour straight from a GitHub repository.</p>
       <p>
-        Append a <code>?tour=</code> parameter pointing at a tour JSON file on
-        GitHub:
+        Wayfarer renders <strong>code tours</strong> straight from a GitHub
+        repository: a guided, narrated walk through a codebase, laid out as one
+        readable, scrollable page. There’s no backend — it fetches the tour and
+        the source files it references from GitHub and syntax-highlights them in
+        your browser.
+      </p>
+      <p>
+        Point it at a tour file by appending a <code>?tour=</code> parameter with
+        the tour JSON’s GitHub blob URL:
       </p>
       <pre className="landing__example">
         <code>{example}</code>
       </pre>
+
+      <h2>Try an example</h2>
+      <ul className="landing__examples">
+        {EXAMPLES.map((ex) => (
+          <li key={ex.file}>
+            <a className="landing__example-link" href={tourHref(ex.file)}>
+              <span className="landing__example-title">{ex.title}</span>
+              <span className="landing__example-blurb">{ex.blurb}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+
+      <h2>Write your own</h2>
       <p>
-        File paths inside the tour are resolved relative to the tour file’s
-        directory in that repo.
+        A tour is a small JSON file listing ordered <em>stops</em>, each pairing
+        markdown prose with a range of lines in a source file. See the{" "}
+        <a href={`${REPO}/blob/main/AUTHORING.md`}>authoring guide</a> for the
+        full format and advice on putting together a good tour — it’s also the
+        file to hand an agent when you want it to generate one.
       </p>
     </div>
   );
