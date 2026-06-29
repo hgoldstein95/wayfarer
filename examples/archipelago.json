@@ -1,0 +1,91 @@
+{
+  "title": "Archipelago: making a graph of checks fun to play",
+  "description": "[Archipelago](https://github.com/ArchipelagoMW/Archipelago) is a multi-game randomizer: it shuffles the items of many games into one shared item pool, so the sword you need might be hiding in someone else's game. The hard part isn't shuffling — it's shuffling *well*. A random placement can be unbeatable (the item you need is locked behind itself) or just miserable (you find nothing useful for an hour while everyone else plays).\n\nThis tour follows one thread: **how Archipelago turns the directed graph of \"which checks unlock which checks\" into a seed that is both solvable and fun to play.** The two ideas at the center are *reachability spheres* (waves of locations you can reach as you collect items) and *progression balancing* (nudging important items earlier so nobody sits idle). We start with the vocabulary, build up the reachability engine, watch the fill algorithm place items so the seed stays beatable, then see the balancer smooth out the pacing.\n\nPinned to commit `e6e0bc3`. The core lives in just two files: `BaseClasses.py` (the world model) and `Fill.py` (the placement algorithms).",
+  "externalRepository": "https://github.com/ArchipelagoMW/Archipelago/tree/e6e0bc30420d13085f6f86b29ffa7e1594a8c46a",
+  "stops": [
+    {
+      "title": "The vocabulary: what kind of item is this?",
+      "content": "Everything downstream hinges on this enum. Each item carries an `ItemClassification`, and the bits decide how the placement algorithm treats it.\n\n`progression` is the only flag that matters for solvability — these are the items that unlock new checks, so the fill algorithm guarantees they land somewhere reachable. `useful` items are protected from being dumped on excluded/unreachable spots but aren't required. Everything else (`filler`, `trap`) is decoration the algorithm can scatter freely.\n\nThe two subtle flags are the ones that exist purely to make seeds *feel* good. `skip_balancing` marks progression that's logically required but pointless to pull earlier (currency, or goal items you specifically want spread evenly) — the balancer leaves it alone. `deprioritized` marks progression that would feel like a let-down on a hand-picked \"priority\" location. Note these \"never occur on their own\": they're always OR'd onto `progression`, which is why the combined constants below exist.",
+      "file": "BaseClasses.py",
+      "line": 1553,
+      "endLine": 1590
+    },
+    {
+      "title": "Spheres: the game as waves of reachability",
+      "content": "This is the central concept the whole tour orbits. A *sphere* is the set of locations you can reach with what you currently have. `get_spheres` computes them by simulation: start with an empty `CollectionState`, find every location reachable now (sphere 0), pretend to collect all their items, find what *that* opens up (sphere 1), and repeat.\n\nThe `state.collect(...)` loop at the bottom is the engine of pacing: collecting a sphere's items is what unlocks the next sphere. A seed where all the good items sit in sphere 12 is a slog; a seed where they're spread across spheres 1–12 stays engaging. Everything else in this tour is in service of shaping these waves.\n\nNote the tell at the end: if a sphere comes back empty but locations remain, those locations are *unreachable*, and they're yielded as a final set. That's how the generator detects an unbeatable layout — a dead branch in the DAG.",
+      "file": "BaseClasses.py",
+      "line": 585,
+      "endLine": 610
+    },
+    {
+      "title": "The reachability engine: walking the region graph",
+      "content": "Spheres are built on one question asked millions of times: *given these items, can I reach this spot?* A world is a graph of `Region`s joined by `Entrance`s, and reachability is a breadth-first search over it.\n\n`update_reachable_regions` is the entry point. It starts from the world's `origin_region_name` (where the player begins), seeds the queue with that region's exits, and tracks `blocked_connections` — entrances it has seen but can't yet pass. The actual BFS is delegated to one of two helpers depending on whether the world declares its indirect connections explicitly (an optimization for large worlds). The `stale[player]` flag at the top is the cache key: state only recomputes regions when an item collection might have changed the answer.",
+      "file": "BaseClasses.py",
+      "line": 753,
+      "endLine": 769
+    },
+    {
+      "title": "Why the search has to loop: indirect connections",
+      "content": "Here's the BFS itself. For each blocked connection it asks `connection.can_reach(self)` — the entrance's access rule, e.g. \"do you have the hookshot?\" If yes, the new region is reached, its exits are queued, and we keep going.\n\nThe tricky part is lines 791–796. Some access rules depend on regions *other* than the one the entrance connects from — \"this door opens once you've reached the far side of the lake.\" A naive BFS would miss those, because the door was checked and rejected before the lake became reachable. So when a new region is reached, any entrances registered as depending on it (`indirect_connections`) are thrown back onto the queue to be retried. This is what lets games express genuinely non-local logic without the search giving a wrong answer.",
+      "file": "BaseClasses.py",
+      "line": 771,
+      "endLine": 796
+    },
+    {
+      "title": "Collecting an item grows the frontier",
+      "content": "This tiny method is the hinge between \"I have an item\" and \"new checks are reachable.\" When the state collects an item, it marks that player's regions `stale` (so the next reachability query recomputes) and — unless the caller defers it — immediately calls `sweep_for_advancements`.\n\nA *sweep* repeatedly collects every reachable progression item until nothing new opens up: collecting a key reaches a chest, which holds a boot, which reaches another region, and so on. In other words, one `collect` can cascade through an entire sphere. The `prevent_sweep` flag exists because the sphere algorithms you've seen do their own batched collection and don't want each item triggering a full re-sweep — they sweep deliberately, once per wave.",
+      "file": "BaseClasses.py",
+      "line": 1126,
+      "endLine": 1137
+    },
+    {
+      "title": "Placing items so the seed stays beatable",
+      "content": "`fill_restrictive` is the heart of generation: it places progression items one at a time while guaranteeing the seed never paints itself into a corner. This is the inner step.\n\nBefore each placement it builds a `maximum_exploration_state` — `sweep_from_pool` assumes the player will eventually collect *every item still unplaced*, then sweeps. That answers \"with optimistic future items, what's reachable right now?\" An item is only allowed into a location that `can_fill` under that optimistic state, which keeps placements honest without forcing a strict early-game order.\n\nThe `Accessibility.option_minimal` branch is the escape hatch: a player who only cares about *beating* the game (not 100%) skips the per-location reachability check once the game is already winnable, so their leftover items can go anywhere. The loop below scans locations and drops the item in the first one that accepts it.",
+      "file": "Fill.py",
+      "line": 85,
+      "endLine": 114
+    },
+    {
+      "title": "The dead-end recovery: swapping placed items",
+      "content": "Greedy placement sometimes wedges itself: the next item needs a reachable spot, but every reachable spot is already taken. Rather than restart, `fill_restrictive` *swaps*. This block runs when the location scan above (the `for...else`) found nowhere to put the item.\n\n`swap_attempts` is the key idea: it walks already-placed items and tries to evict one — first \"safely\" (`unsafe=False`: the displaced item can still be placed afterward) and only then \"unsafely\" (assuming some later swap will clean up, which isn't guaranteed and can fail generation). The `swapped_items` counter caps how many times any one item may be swapped, because pathological pools can otherwise swap forever. Just below this window, the evicted location is re-tested with `can_fill` against the swap state; if the new item fits, the old item is pushed back onto the queue to be re-placed. This recovery is the difference between a generator that occasionally gives up and one that almost always finds a valid, beatable layout.",
+      "file": "Fill.py",
+      "line": 118,
+      "endLine": 143
+    },
+    {
+      "title": "Orchestration: priority, default, excluded — and item tiers",
+      "content": "`distribute_items_restrictive` is the conductor. Having shuffled the pool, it splits items by the classifications from the first stop — `advancement` (progression) into `progitempool`, `useful` into its own pool, the rest into `filler` — and splits *locations* by `LocationProgressType`.\n\nThe ordering here is the whole strategy. Progression is placed first, with the full reachability discipline of `fill_restrictive`, into priority and then default locations. Useful and filler come afterward with a cheap `remaining_fill` that doesn't need reachability checks — by then the seed is already beatable, so where the loot lands only affects flavor, not solvability. PRIORITY locations get progression preferentially (the author marked them as \"something good should be here\"); EXCLUDED locations are walled off from anything that matters. This is how a player's hand-tuned preferences survive the randomizer.",
+      "file": "Fill.py",
+      "line": 505,
+      "endLine": 527
+    },
+    {
+      "title": "The player's dial: how strict should reachability be?",
+      "content": "Before we get to balancing, meet the option that decides what \"fun\" even means for a given player. `Accessibility` is a per-player setting.\n\n`full` (the default) promises every location and item is reachable — for completionists who want nothing stranded. `minimal` promises only that the *goal* is reachable; getting there may leave chests forever locked, which is fine if you just want to win. `ItemsAccessibility` adds a middle `items` tier: every logically relevant item is obtainable, but some self-locking keys or filler locations may not be. Back in `fill_restrictive`, this is exactly the setting that flipped `perform_access_check` on and off — it's the knob that trades placement freedom against thoroughness.",
+      "file": "Options.py",
+      "line": 1342,
+      "endLine": 1372
+    },
+    {
+      "title": "Progression balancing: the cure for \"BK mode\"",
+      "content": "A beatable seed can still be boring. In a multiworld your progression might all sit in *other* people's games, so you check off your easy locations in ten minutes and then wait, with nothing to do, while others find your keys. Players call this \"BK mode\" (beatable-but-killed). `balance_multiworld_progression` runs *after* fill to fix it.\n\nThe `ProgressionBalancing` option is a 0–99 dial per player (default 50). The comment lays out the whole algorithm: walk the spheres, find the player who has the most locations available by this point, and if anyone is lagging too far behind that leader, pull some of their progression items into earlier spheres so they have more to do sooner. `balanceable_players` collects everyone who opted in, scaled by their dial.",
+      "file": "Fill.py",
+      "line": 734,
+      "endLine": 750
+    },
+    {
+      "title": "Measuring the lag: thresholds per sphere",
+      "content": "This runs once per sphere as the balancer sweeps forward. `max_percentage` is the fraction of locations the *best-off* player can already reach. Each balancing player's threshold is that maximum scaled by their personal dial — at the `extreme` setting (99) you demand to keep nearly level with the leader; at low settings you tolerate falling far behind.\n\n`balancing_players` is then the set who are currently *below* their threshold — the people stuck in BK mode at this sphere. If that set is non-empty, the balancer goes looking (in the code just below) for progression items sitting in later spheres that it could pull forward to give these players more reachable checks right now. Computing this against actual reachable-location *percentages*, rather than raw counts, is what keeps balancing fair between a player with 30 locations and one with 300.",
+      "file": "Fill.py",
+      "line": 803,
+      "endLine": 816
+    },
+    {
+      "title": "The payoff: swapping progression earlier",
+      "content": "Having identified which items to pull forward (`items_to_replace`) and a set of earlier, already-checked spots to receive them (`replacement_locations`), the balancer performs the swaps. For each item it finds an earlier location where the two items can trade places — `can_fill` checked both directions — and calls `swap_location_item`.\n\nThe comment on line 888 captures why this is safe: because items only ever move into *earlier* spheres, a swapped item is by construction still reachable, so no fresh accessibility check is needed. Each successful swap means a lagging player will find one of their progression items sooner, shrinking the dead time. That's the end of the thread: classifications label what matters, the reachability engine and spheres model the DAG, `fill_restrictive` places items so the seed is always beatable, and this balancer reshapes the spheres so it's also worth playing.",
+      "file": "Fill.py",
+      "line": 888,
+      "endLine": 902
+    }
+  ]
+}
